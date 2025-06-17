@@ -1,0 +1,29 @@
+# This workflow builds the flake to ensure it is not broken.
+# It runs on every push and pull request to the main branch.
+name: "CI - Build Flake"
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Get the code from the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Install the Nix package manager
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      # 3. Build the default package defined in the flake
+      - name: Build Flake Package
+        run: nix build .#
