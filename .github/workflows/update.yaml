@@ -1,0 +1,51 @@
+# This workflow automatically checks for updates to the task-master-ai package.
+name: "Update Flake Dependencies"
+
+on:
+  # Allows manual triggering from the GitHub Actions UI.
+  workflow_dispatch:
+  # Runs on a schedule (every Monday at 08:00 UTC).
+  schedule:
+    - cron: '0 8 * * 1'
+
+jobs:
+  update-flake:
+    runs-on: ubuntu-latest
+    # Required permissions for the action to create a pull request on your behalf.
+    permissions:
+      contents: write
+      pull-requests: write
+      
+    steps:
+      # 1. Get the code from your repository.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Install the Nix package manager.
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      # 3. Run nix-update. This tool inspects flake.nix, finds the package,
+      #    checks GitHub for a newer release, and edits the file if one is found.
+      - name: Update package with nix-update
+        run: nix-shell -p nix-update --run "nix-update --file flake.nix task-master-ai"
+
+      # 4. Use a standard action to create a pull request if any files were changed.
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(deps): update task-master-ai"
+          title: "Automated Update for task-master-ai"
+          body: |
+            This is an automated pull request to update the `task-master-ai` package to the latest version.
+
+            ### Action Required
+            If the CI build fails due to an `npmDepsHash` mismatch, please update the hash manually:
+            1. Check the failed CI build log for the correct hash.
+            2. Update the `npmDepsHash` value in `flake.nix` in this pull request's branch.
+            3. Commit and push the change to this branch. The CI will re-run.
+          labels: "dependencies, automated"
+          branch: "automated-updates" # Creates a branch with this name for the PR
