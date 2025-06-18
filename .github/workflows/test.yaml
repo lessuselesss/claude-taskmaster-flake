@@ -1,0 +1,25 @@
+name: Test Flake Functionality
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-flake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - name: Test Application
+        run: nix run .# -- --help
+      - name: Test Development Shell
+        run: nix develop .# --command bash -c "node --version && npm --version && nix-update --version"
