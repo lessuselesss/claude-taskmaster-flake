@@ -19,7 +19,7 @@
 
         # This is the package definition for task-master-ai.
         # It's based on the standard buildNpmPackage function.
-        task-master-ai = pkgs.buildNpmPackage (finalAttrs: {
+        claude-taskmasster = pkgs.buildNpmPackage (finalAttrs: {
           pname = "task-master-ai";
           version = "0.16.2"; # This version will be automatically updated by the workflow
 
