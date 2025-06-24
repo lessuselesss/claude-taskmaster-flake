@@ -1,51 +1,85 @@
-# This workflow automatically checks for updates to the task-master-ai package.
-name: "Update Flake Dependencies"
+name: Automatic Flake Update
 
 on:
-  # Allows manual triggering from the GitHub Actions UI.
-  workflow_dispatch:
-  # Runs on a schedule (every Monday at 08:00 UTC).
   schedule:
-    - cron: '0 8 * * 1'
+    - cron: '0 3 * * *'  # Daily at 03:00 UTC
+  workflow_dispatch:
 
 jobs:
   update-flake:
     runs-on: ubuntu-latest
-    # Required permissions for the action to create a pull request on your behalf.
     permissions:
       contents: write
-      pull-requests: write
-      
+
     steps:
-      # 1. Get the code from your repository.
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Install the Nix package manager.
-      - name: Install Nix
-        uses: cachix/install-nix-action@v26
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Set up Nix
+        uses: cachix/install-nix-action@v27
 
-      # 3. Run nix-update. This tool inspects flake.nix, finds the package,
-      #    checks GitHub for a newer release, and edits the file if one is found.
-      - name: Update package with nix-update
-        run: nix-shell -p nix-update --run "nix-update --file flake.nix task-master-ai"
+      - name: Update flake.lock
+        run: nix flake update
 
-      # 4. Use a standard action to create a pull request if any files were changed.
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(deps): update task-master-ai"
-          title: "Automated Update for task-master-ai"
-          body: |
-            This is an automated pull request to update the `task-master-ai` package to the latest version.
+      - name: Auto-fix hash mismatches in flake.nix
+        shell: bash
+        run: |
+          set -e
 
-            ### Action Required
-            If the CI build fails due to an `npmDepsHash` mismatch, please update the hash manually:
-            1. Check the failed CI build log for the correct hash.
-            2. Update the `npmDepsHash` value in `flake.nix` in this pull request's branch.
-            3. Commit and push the change to this branch. The CI will re-run.
-          labels: "dependencies, automated"
-          branch: "automated-updates" # Creates a branch with this name for the PR
+          MAX_ATTEMPTS=5
+          attempt=1
+          updated=0
+
+          while [ $attempt -le $MAX_ATTEMPTS ]; do
+            echo "Build attempt: $attempt"
+            # Try to build; capture output and error logs
+            if nix build .; then
+              echo "Build succeeded!"
+              break
+            fi
+
+            # Find all hash mismatches in the build error output
+            # Nix error pattern: 'got: ... wanted: ...'
+            HASH_MISMATCHES=$(grep -rPo 'got:\s*"\K[^"]+' . || true)
+
+            if [ -z "$HASH_MISMATCHES" ]; then
+              echo "No more hash mismatches found."
+              break
+            fi
+
+            for got in $HASH_MISMATCHES; do
+              # Find the corresponding 'wanted' hash (look for the pattern close to 'got')
+              wanted=$(grep -rPo "wanted:\s*\"\K[^\"']+" . | head -n 1)
+              if [ -z "$wanted" ]; then
+                echo "Could not find 'wanted' hash for got: $got, skipping."
+                continue
+              fi
+              # Update all occurrences in flake.nix
+              sed -i "s/$wanted/$got/g" flake.nix
+              echo "Updated hash: $wanted -> $got"
+              updated=1
+            done
+
+            # Stage and commit if anything changed
+            if [ $updated -eq 1 ]; then
+              git add flake.nix
+              git commit -m "fix: update hash in flake.nix (auto-fix attempt $attempt)" || true
+              updated=0
+            fi
+
+            attempt=$((attempt+1))
+          done
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add flake.lock flake.nix
+          if git diff --cached --quiet; then
+            echo "No flake update."
+            exit 0
+          fi
+          git commit -m "chore: update flake.lock and fix hash mismatches"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}sk
