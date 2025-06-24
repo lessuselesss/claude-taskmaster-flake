@@ -41,7 +41,7 @@
           dontNpmBuild = true;
 
           # These are build-time dependencies needed to install the NPM packages.
-          nativeBuildInputs = [ pkgs.nodejs pkgs.npm ];
+          nativeBuildInputs = [ pkgs.nodejs pkgs.nodejs.pkgs.npm ];
 
           # Metadata about the package.
           meta = with pkgs.lib; {
