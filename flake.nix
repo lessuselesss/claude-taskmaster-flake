@@ -68,6 +68,7 @@
         # Defines a development shell with useful tools, accessible via `nix develop`
         devShells.default = pkgs.mkShell {
           packages = [
+            pkgs.nix-update
             pkgs.nodejs
             pkgs.nodejs.pkgs.npm
             pkgs.nix-update
