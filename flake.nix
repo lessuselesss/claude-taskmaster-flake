@@ -71,7 +71,7 @@
             pkgs.nix-update
             pkgs.nodejs
             pkgs.nodejs.pkgs.npm
-            pkgs.nix-update
+            task-master-ai # Add this line
           ];
         };
       }
