@@ -21,6 +21,29 @@ jobs:
       - name: Update flake.lock
         run: nix flake update
 
+      - name: Get latest upstream version
+        id: get_version
+        run: |
+          LATEST_VERSION=$(curl -s "https://api.github.com/repos/eyaltoledano/claude-task-master/releases/latest" | jq -r '.tag_name')
+          # Remove 'v' prefix if present
+          LATEST_VERSION=${LATEST_VERSION#v}
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update version in flake.nix
+        run: |
+          CURRENT_VERSION=$(grep -oP 'version = "\K[^"]+' flake.nix)
+          LATEST_VERSION=${{ steps.get_version.outputs.latest_version }}
+          if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+            echo "Updating version from $CURRENT_VERSION to $LATEST_VERSION"
+            sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$LATEST_VERSION\"/g" flake.nix
+            git add flake.nix
+            git commit -m "chore: update task-master-ai version to $LATEST_VERSION" || true
+          else
+            echo "Version is already up-to-date: $CURRENT_VERSION"
+          fi
+
       - name: Auto-fix hash mismatches in flake.nix
         shell: bash
         run: |
