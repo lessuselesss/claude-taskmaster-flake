@@ -21,7 +21,7 @@
         # It's based on the standard buildNpmPackage function.
         task-master-ai = pkgs.buildNpmPackage (finalAttrs: {
           pname = "task-master-ai";
-          version = "task-master-ai@0.30.2"; # This version will be automatically updated by the workflow
+          version = "task-master-ai@0.31.1"; # This version will be automatically updated by the workflow
 
           # fetchFromGitHub is the standard fetcher for getting source from GitHub releases.
           src = pkgs.fetchFromGitHub {
